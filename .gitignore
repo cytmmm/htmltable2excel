@@ -18,3 +18,7 @@ yarn-error.log*
 
 # node (if added later)
 node_modules/
+
+# local helpers (not part of published code)
+tools/
+scripts/
