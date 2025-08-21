@@ -44,6 +44,20 @@ Hot reload flow:
 bash scripts/pack.sh
 ```
 
+#### GitHub Actions Release (optional)
+- A workflow in `.github/workflows/release.yml` packages and publishes a Release when you push a tag like `v1.0.0`.
+- Steps:
+  1) Bump `version` in `manifest.json`
+  2) Commit and push
+  3) Create a tag and push it, e.g.:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Artifacts and a GitHub Release will be created automatically.
+
 ### Store submission
 - Prepare icons `icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` (use the tool in `tools/`).
 - Bump `version` in `manifest.json`.
