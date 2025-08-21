@@ -1,5 +1,7 @@
 ## HTML Table to Excel (Chrome Extension, MV3)
 
+[中文说明](README.zh-CN.md)
+
 Export HTML tables from any web page to real Excel (.xlsx) with one click. Right‑click near a table to export. Handles split header/body table patterns by merging them before export. All processing is local.
 
 ### Features
