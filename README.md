@@ -38,33 +38,5 @@ Hot reload flow:
 - After edits, refresh the extension in `chrome://extensions/`, then refresh your target page.
 - Content‑script logs are prefixed with `[Table2Excel]` in DevTools Console.
 
-### Build/Release
-- No build step required. To package a zip for Web Store:
-  - Run the script below (creates `dist/htmltabletoexcel-<version>.zip`).
-
-```bash
-bash scripts/pack.sh
-```
-
-#### GitHub Actions Release (optional)
-- A workflow in `.github/workflows/release.yml` packages and publishes a Release when you push a tag like `v1.0.0`.
-- Steps:
-  1) Bump `version` in `manifest.json`
-  2) Commit and push
-  3) Create a tag and push it, e.g.:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Artifacts and a GitHub Release will be created automatically.
-
-### Store submission
-- Prepare icons `icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` (use the tool in `tools/`).
-- Bump `version` in `manifest.json`.
-- Upload the zip to the Chrome Web Store Developer Console and fill out listing details.
-- Listing copy provided in `store/STORE_LISTING_ZH.md` and `store/STORE_LISTING_EN.md`.
-
 ### License
 MIT — see `LICENSE`.

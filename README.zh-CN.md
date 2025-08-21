@@ -38,28 +38,5 @@
 - 每次修改后在 `chrome://extensions/` 刷新扩展，然后刷新目标页面
 - 内容脚本日志在 DevTools Console 中，前缀为 `[Table2Excel]`
 
-### 构建/发布
-- 无需构建；打包为商店 zip：
-
-```bash
-bash scripts/pack.sh
-```
-
-会生成 `dist/htmltabletoexcel-<version>.zip`。
-
-#### GitHub Actions（可选）
-- 推送 tag（如 `v1.0.0`）时，工作流 `.github/workflows/release.yml` 会自动打包并创建 GitHub Release：
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-### 商店上架
-- 准备图标：`icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`（可用 `tools/` 工具生成）
-- 递增 `manifest.json` 的 `version`
-- 上传 zip 至 Chrome Web Store 开发者后台，填写信息
-- 可直接使用 `store/STORE_LISTING_ZH.md` 与 `store/STORE_LISTING_EN.md` 的描述
-
 ### 许可协议
 MIT — 见 `LICENSE`。
