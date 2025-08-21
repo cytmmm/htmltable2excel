@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Icon Generator</title>
+<style>
+	body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px}
+	label{display:block;margin:8px 0 4px}
+	canvas{border:1px solid #ddd;margin:8px 0}
+	.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+	.card{border:1px solid #eee;border-radius:8px;padding:12px}
+	.row{margin:8px 0}
+	button{padding:6px 12px}
+</style>
+</head>
+<body>
+	<h1>Icon Generator</h1>
+	<p>输入一个 Emoji 或短文字，生成多尺寸 PNG 图标。</p>
+
+	<label>字符（推荐 Emoji，如 📊）</label>
+	<input id="glyph" value="📊" />
+	<label>背景色</label>
+	<input id="bg" type="color" value="#1e88e5" />
+	<label>文字色</label>
+	<input id="fg" type="color" value="#ffffff" />
+	<div class="row"><button id="gen">生成</button></div>
+
+	<div class="grid" id="out"></div>
+
+<script>
+const sizes = [16,32,48,128];
+function draw(size, glyph, bg, fg){
+	const canvas = document.createElement('canvas');
+	canvas.width = size; canvas.height = size;
+	const ctx = canvas.getContext('2d');
+	ctx.fillStyle = bg; ctx.fillRect(0,0,size,size);
+	ctx.fillStyle = fg;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.font = `${Math.floor(size*0.6)}px system-ui,Apple Color Emoji,Segoe UI Emoji`;
+	ctx.fillText(glyph, size/2, size/2);
+	return canvas;
+}
+
+document.getElementById('gen').onclick = () => {
+	const glyph = document.getElementById('glyph').value || '📊';
+	const bg = document.getElementById('bg').value || '#1e88e5';
+	const fg = document.getElementById('fg').value || '#ffffff';
+	const out = document.getElementById('out');
+	out.innerHTML = '';
+	sizes.forEach(size => {
+		const canvas = draw(size, glyph, bg, fg);
+		const url = canvas.toDataURL('image/png');
+		const card = document.createElement('div');
+		card.className = 'card';
+		card.innerHTML = `<div>${size}x${size}</div>`;
+		card.appendChild(canvas);
+		const a = document.createElement('a');
+		a.href = url; a.download = `icon${size}.png`; a.textContent = '下载';
+		card.appendChild(a);
+		out.appendChild(card);
+	});
+};
+</script>
+</body>
+</html>

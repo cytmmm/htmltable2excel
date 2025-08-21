@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+__MACOSX/
+
+# archives
+/dist/
+*.zip
+
+# editor
+.vscode/
+.idea/
+*.iml
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# node (if added later)
+node_modules/
