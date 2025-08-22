@@ -39,6 +39,229 @@
 		}
 	}
 
+	function ensureUiStyle() {
+		if (document.getElementById('htmltabletoexcel-ui-style')) return;
+		const style = document.createElement('style');
+		style.id = 'htmltabletoexcel-ui-style';
+		style.textContent = [
+			'.htmltabletoexcel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:2147483646;display:flex;align-items:center;justify-content:center}',
+			'.htmltabletoexcel-dialog{background:#fff;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.2);width:min(900px,92vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif}',
+			'.htmltabletoexcel-header{padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}',
+			'.htmltabletoexcel-title{font-size:16px;font-weight:600}',
+			'.htmltabletoexcel-body{display:flex;gap:12px;padding:12px;overflow:auto}',
+			'.htmltabletoexcel-side{flex:0 0 240px;display:flex;flex-direction:column;gap:10px}',
+			'.htmltabletoexcel-section{border:1px solid #f0f0f0;border-radius:6px;padding:10px}',
+			'.htmltabletoexcel-section h4{margin:0 0 8px 0;font-size:13px}',
+			'.htmltabletoexcel-cols{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}',
+			'.htmltabletoexcel-preview{flex:1 1 auto;border:1px solid #f0f0f0;border-radius:6px;padding:8px;overflow:auto}',
+			'.htmltabletoexcel-preview table{border-collapse:collapse;width:100%}',
+			'.htmltabletoexcel-preview th,.htmltabletoexcel-preview td{border:1px solid #ddd;padding:6px 8px;font-size:12px}',
+			'.htmltabletoexcel-footer{padding:12px 16px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:8px}',
+			'.htmltabletoexcel-btn{appearance:none;border:1px solid #d9d9d9;background:#fff;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}',
+			'.htmltabletoexcel-btn.primary{background:#1677ff;border-color:#1677ff;color:#fff}',
+			'.htmltabletoexcel-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:2147483647;background:rgba(0,0,0,.85);color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;max-width:80vw;white-space:pre-wrap}'
+		].join('');
+		document.documentElement.appendChild(style);
+	}
+
+	function showToast(message, durationMs) {
+		try {
+			ensureUiStyle();
+			const el = document.createElement('div');
+			el.className = 'htmltabletoexcel-toast';
+			el.textContent = String(message || '');
+			document.body.appendChild(el);
+			setTimeout(() => { try { el.remove(); } catch (e) {} }, Math.max(1000, durationMs || 2000));
+		} catch (e) {}
+	}
+
+	function cloneTableWithSelectedColumns(table, selectedIndexes) {
+		const idxSet = new Set(selectedIndexes || []);
+		const clone = document.createElement('table');
+		clone.setAttribute('border', '1');
+		clone.style.borderCollapse = 'collapse';
+		// clone colgroup if present and filter cols
+		const cg = table.querySelector('colgroup');
+		if (cg) {
+			const newCg = document.createElement('colgroup');
+			const cols = Array.from(cg.children || []);
+			for (let i = 0; i < cols.length; i++) {
+				if (idxSet.has(i)) newCg.appendChild(cols[i].cloneNode(true));
+			}
+			if (newCg.children.length) clone.appendChild(newCg);
+		}
+		const processSection = (section) => {
+			if (!section) return null;
+			const newSection = document.createElement(section.tagName.toLowerCase());
+			for (const row of Array.from(section.rows || [])) {
+				const newRow = document.createElement('tr');
+				const cells = Array.from(row.cells || []);
+				for (let i = 0; i < cells.length; i++) {
+					if (!idxSet.has(i)) continue;
+					newRow.appendChild(cells[i].cloneNode(true));
+				}
+				if (newRow.cells.length > 0) newSection.appendChild(newRow);
+			}
+			return newSection;
+		};
+		const thead = processSection(table.querySelector('thead'));
+		if (thead) clone.appendChild(thead);
+		const tbodyElts = table.tBodies && table.tBodies.length ? Array.from(table.tBodies) : [table.querySelector('tbody')].filter(Boolean);
+		for (const tb of tbodyElts) {
+			const newTb = processSection(tb);
+			if (newTb && newTb.rows.length) clone.appendChild(newTb);
+		}
+		return clone;
+	}
+
+	function buildDialogForSingle(table, onConfirm, onCancel) {
+		ensureUiStyle();
+		const overlay = document.createElement('div');
+		overlay.className = 'htmltabletoexcel-overlay';
+		const dialog = document.createElement('div');
+		dialog.className = 'htmltabletoexcel-dialog';
+
+		const header = document.createElement('div');
+		header.className = 'htmltabletoexcel-header';
+		const title = document.createElement('div');
+		title.className = 'htmltabletoexcel-title';
+		title.textContent = '导出表格';
+		header.appendChild(title);
+		const closeBtn = document.createElement('button');
+		closeBtn.className = 'htmltabletoexcel-btn';
+		closeBtn.textContent = '关闭';
+		closeBtn.onclick = () => { try { overlay.remove(); } catch (e) {} onCancel && onCancel(); };
+		header.appendChild(closeBtn);
+
+		const body = document.createElement('div');
+		body.className = 'htmltabletoexcel-body';
+		const side = document.createElement('div');
+		side.className = 'htmltabletoexcel-side';
+		const secFormat = document.createElement('div');
+		secFormat.className = 'htmltabletoexcel-section';
+		secFormat.innerHTML = '<h4>导出格式</h4>'
+			+ '<label><input type="radio" name="hte-format" value="xlsx" checked> XLSX</label><br>'
+			+ '<label><input type="radio" name="hte-format" value="csv"> CSV</label><br>'
+			+ '<label><input type="radio" name="hte-format" value="json"> JSON</label>';
+		side.appendChild(secFormat);
+
+		const secCols = document.createElement('div');
+		secCols.className = 'htmltabletoexcel-section';
+		const colsWrap = document.createElement('div');
+		colsWrap.className = 'htmltabletoexcel-cols';
+		const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
+		const colCount = headerRow ? headerRow.cells.length : 0;
+		secCols.innerHTML = '<h4>选择列</h4>';
+		for (let i = 0; i < colCount; i++) {
+			const label = document.createElement('label');
+			const cb = document.createElement('input');
+			cb.type = 'checkbox';
+			cb.value = String(i);
+			cb.checked = true;
+			label.appendChild(cb);
+			label.appendChild(document.createTextNode(' 第' + (i + 1) + '列'));
+			colsWrap.appendChild(label);
+		}
+		secCols.appendChild(colsWrap);
+		side.appendChild(secCols);
+
+		const preview = document.createElement('div');
+		preview.className = 'htmltabletoexcel-preview';
+		const previewTable = table.cloneNode(true);
+		preview.appendChild(previewTable);
+
+		const updatePreview = () => {
+			const selected = Array.from(colsWrap.querySelectorAll('input[type="checkbox"]')).filter(c => c.checked).map(c => Number(c.value));
+			const filtered = cloneTableWithSelectedColumns(table, selected);
+			preview.innerHTML = '';
+			preview.appendChild(filtered);
+		};
+		colsWrap.addEventListener('change', updatePreview);
+
+		body.appendChild(side);
+		body.appendChild(preview);
+
+		const footer = document.createElement('div');
+		footer.className = 'htmltabletoexcel-footer';
+		const cancelBtn = document.createElement('button');
+		cancelBtn.className = 'htmltabletoexcel-btn';
+		cancelBtn.textContent = '取消';
+		cancelBtn.onclick = () => { try { overlay.remove(); } catch (e) {} onCancel && onCancel(); };
+		const okBtn = document.createElement('button');
+		okBtn.className = 'htmltabletoexcel-btn primary';
+		okBtn.textContent = '导出';
+		okBtn.onclick = () => {
+			const format = (secFormat.querySelector('input[name="hte-format"]:checked') || {}).value || 'xlsx';
+			const selected = Array.from(colsWrap.querySelectorAll('input[type="checkbox"]')).filter(c => c.checked).map(c => Number(c.value));
+			try { overlay.remove(); } catch (e) {}
+			onConfirm && onConfirm({ format, selectedColumns: selected });
+		};
+		footer.appendChild(cancelBtn);
+		footer.appendChild(okBtn);
+
+		dialog.appendChild(header);
+		dialog.appendChild(body);
+		dialog.appendChild(footer);
+		overlay.appendChild(dialog);
+		document.body.appendChild(overlay);
+		updatePreview();
+	}
+
+	function buildDialogForBatch(onConfirm, onCancel) {
+		ensureUiStyle();
+		const overlay = document.createElement('div');
+		overlay.className = 'htmltabletoexcel-overlay';
+		const dialog = document.createElement('div');
+		dialog.className = 'htmltabletoexcel-dialog';
+		const header = document.createElement('div');
+		header.className = 'htmltabletoexcel-header';
+		const title = document.createElement('div');
+		title.className = 'htmltabletoexcel-title';
+		title.textContent = '批量导出 - 选择格式';
+		header.appendChild(title);
+		const closeBtn = document.createElement('button');
+		closeBtn.className = 'htmltabletoexcel-btn';
+		closeBtn.textContent = '关闭';
+		closeBtn.onclick = () => { try { overlay.remove(); } catch (e) {} onCancel && onCancel(); };
+		header.appendChild(closeBtn);
+
+		const body = document.createElement('div');
+		body.className = 'htmltabletoexcel-body';
+		const side = document.createElement('div');
+		side.className = 'htmltabletoexcel-side';
+		const secFormat = document.createElement('div');
+		secFormat.className = 'htmltabletoexcel-section';
+		secFormat.innerHTML = '<h4>导出格式</h4>'
+			+ '<label><input type="radio" name="hte-format-batch" value="xlsx" checked> XLSX</label><br>'
+			+ '<label><input type="radio" name="hte-format-batch" value="csv"> CSV</label><br>'
+			+ '<label><input type="radio" name="hte-format-batch" value="json"> JSON</label>';
+		side.appendChild(secFormat);
+		body.appendChild(side);
+
+		const footer = document.createElement('div');
+		footer.className = 'htmltabletoexcel-footer';
+		const cancelBtn = document.createElement('button');
+		cancelBtn.className = 'htmltabletoexcel-btn';
+		cancelBtn.textContent = '取消';
+		cancelBtn.onclick = () => { try { overlay.remove(); } catch (e) {} onCancel && onCancel(); };
+		const okBtn = document.createElement('button');
+		okBtn.className = 'htmltabletoexcel-btn primary';
+		okBtn.textContent = '开始导出';
+		okBtn.onclick = () => {
+			const format = (secFormat.querySelector('input[name="hte-format-batch"]:checked') || {}).value || 'xlsx';
+			try { overlay.remove(); } catch (e) {}
+			onConfirm && onConfirm({ format });
+		};
+		footer.appendChild(cancelBtn);
+		footer.appendChild(okBtn);
+
+		dialog.appendChild(header);
+		dialog.appendChild(body);
+		dialog.appendChild(footer);
+		overlay.appendChild(dialog);
+		document.body.appendChild(overlay);
+	}
+
 	document.addEventListener(
 		"contextmenu",
 		function (event) {
@@ -230,6 +453,107 @@
 		return rows;
 	}
 
+	function getCellText(cellElement) {
+		const baseText = (cellElement.innerText || cellElement.textContent || '').replace(/\s+/g, ' ').trim();
+		const anchors = Array.from(cellElement.querySelectorAll('a[href]'));
+		const images = Array.from(cellElement.querySelectorAll('img[src]'));
+		let text = baseText;
+		if (anchors.length > 0) {
+			const urls = anchors.map(a => toAbsoluteUrl(a.getAttribute('href'))).filter(Boolean);
+			if (urls.length) {
+				text = text ? `${text} (${urls.join(', ')})` : urls.join(', ');
+			}
+		}
+		if (images.length > 0) {
+			const parts = images.map(img => {
+				const alt = (img.getAttribute('alt') || img.getAttribute('title') || '').trim();
+				const src = toAbsoluteUrl(img.getAttribute('src') || '');
+				return alt ? `img:${alt}` : (src ? `img:${src}` : 'img');
+			});
+			text = text ? `${text} [${parts.join('; ')}]` : `[${parts.join('; ')}]`;
+		}
+		return text;
+	}
+
+	function extractPlainRows(table) {
+		const rows = [];
+		const rowElements = table.querySelectorAll('tr');
+		for (const tr of rowElements) {
+			const cells = [];
+			for (const cell of Array.from(tr.cells || [])) {
+				cells.push(getCellText(cell));
+			}
+			if (cells.length > 0) rows.push(cells);
+		}
+		return rows;
+	}
+
+	function csvEscape(field) {
+		const s = String(field == null ? '' : field);
+		const needsQuote = /[",\n\r]/.test(s);
+		const escaped = s.replace(/"/g, '""');
+		return needsQuote ? `"${escaped}"` : escaped;
+	}
+
+	function exportTableToCsv(table) {
+		try {
+			const rows = extractPlainRows(table);
+			const csvLines = rows.map(r => r.map(csvEscape).join(','));
+			const csv = csvLines.join('\r\n');
+			const blob = new Blob(["\uFEFF", csv], { type: 'text/csv;charset=utf-8' });
+			const url = URL.createObjectURL(blob);
+			const fileName = generateFileName('csv');
+			log('exporting as', fileName);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = fileName;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			setTimeout(() => URL.revokeObjectURL(url), 5000);
+		} catch (e) {
+			log('csv export error', e);
+			alert('导出 CSV 失败，请在控制台查看错误信息');
+		}
+	}
+
+	function exportTableToJson(table) {
+		try {
+			const rows = extractPlainRows(table);
+			if (!rows.length) {
+				alert('表格为空，无法导出 JSON');
+				return;
+			}
+			const headers = (rows[0] || []).map((h, i) => {
+				const name = String(h || '').trim();
+				return name || `field${i + 1}`;
+			});
+			const dataRows = rows.slice(1);
+			const objects = dataRows.map(r => {
+				const obj = {};
+				for (let i = 0; i < headers.length; i++) {
+					obj[headers[i]] = r[i] == null ? '' : r[i];
+				}
+				return obj;
+			});
+			const json = JSON.stringify(objects, null, 2);
+			const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+			const url = URL.createObjectURL(blob);
+			const fileName = generateFileName('json');
+			log('exporting as', fileName);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = fileName;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			setTimeout(() => URL.revokeObjectURL(url), 5000);
+		} catch (e) {
+			log('json export error', e);
+			alert('导出 JSON 失败，请在控制台查看错误信息');
+		}
+	}
+
 	function buildSheetXml(data) {
 		let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 		xml += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
@@ -401,6 +725,12 @@
 	}
 
 	function createXlsxBlobFromTable(table) {
+		const zipBytes = createXlsxBytesFromTable(table);
+		return new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+	}
+	// ===== End XLSX generator =====
+
+	function createXlsxBytesFromTable(table) {
 		const data = extractTableData(table);
 		const encoder = new TextEncoder();
 		const files = [
@@ -410,10 +740,8 @@
 			{ name: 'xl/_rels/workbook.xml.rels', data: encoder.encode(buildWorkbookRels()) },
 			{ name: 'xl/worksheets/sheet1.xml', data: encoder.encode(buildSheetXml(data)) }
 		];
-		const zipBytes = zipFiles(files);
-		return new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+		return zipFiles(files);
 	}
-	// ===== End XLSX generator =====
 
 	function exportTableToXlsx(table) {
 		try {
@@ -458,8 +786,116 @@
 				log('export table stats', stats, { merged });
 			} catch (e) {}
 			highlightTable(highlightElement || baseTable);
-			exportTableToXlsx(elementToExport);
-			sendResponse && sendResponse({ ok: true });
+			const format = (message && message.format) || 'xlsx';
+			if (format === 'ask') {
+				buildDialogForSingle(elementToExport, ({ format, selectedColumns }) => {
+					const filtered = Array.isArray(selectedColumns) ? cloneTableWithSelectedColumns(elementToExport, selectedColumns) : elementToExport;
+					try {
+						if (format === 'csv') exportTableToCsv(filtered);
+						else if (format === 'json') exportTableToJson(filtered);
+						else exportTableToXlsx(filtered);
+						showToast('导出成功');
+						sendResponse && sendResponse({ ok: true });
+					} catch (e) {
+						showToast('导出失败');
+						sendResponse && sendResponse({ ok: false });
+					}
+				}, () => {
+					sendResponse && sendResponse({ ok: false, error: 'CANCELLED' });
+				});
+				return true;
+			} else {
+				try {
+					if (format === 'csv') exportTableToCsv(elementToExport);
+					else if (format === 'json') exportTableToJson(elementToExport);
+					else exportTableToXlsx(elementToExport);
+					showToast('导出成功');
+					sendResponse && sendResponse({ ok: true });
+				} catch (e) {
+					showToast('导出失败');
+					sendResponse && sendResponse({ ok: false });
+				}
+			}
+		}
+		if (message && message.type === "EXPORT_ALL_TABLES") {
+			try {
+				let format = (message && message.format) || 'xlsx';
+				if (format === 'ask') {
+					buildDialogForBatch(({ format: f }) => {
+						chrome.runtime.sendMessage({ type: 'EXPORT_ALL_TABLES', format: f });
+					}, () => {});
+					sendResponse && sendResponse({ ok: true });
+					return true;
+				}
+				const allTables = Array.from(document.querySelectorAll('table'));
+				const seen = new Set();
+				const encoder = new TextEncoder();
+				const files = [];
+				let index = 1;
+				for (const table of allTables) {
+					const { elementToExport, highlightElement } = buildUnifiedTableForExport(table);
+					const key = highlightElement || elementToExport;
+					if (seen.has(key)) continue;
+					seen.add(key);
+					const rows = extractPlainRows(elementToExport);
+					if (!rows || rows.length === 0) continue;
+					try { highlightTable(highlightElement || table); } catch (e) {}
+					let name = '';
+					let dataBytes = null;
+					if (format === 'csv') {
+						const csvLines = rows.map(r => r.map(csvEscape).join(','));
+						const csv = csvLines.join('\r\n');
+						const withBom = "\uFEFF" + csv;
+						dataBytes = encoder.encode(withBom);
+						name = `table_${index}.csv`;
+					} else if (format === 'json') {
+						const headers = (rows[0] || []).map((h, i) => {
+							const nm = String(h || '').trim();
+							return nm || `field${i + 1}`;
+						});
+						const dataRows = rows.slice(1);
+						const objects = dataRows.map(r => {
+							const obj = {};
+							for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] == null ? '' : r[i];
+							return obj;
+						});
+						const json = JSON.stringify(objects, null, 2);
+						dataBytes = encoder.encode(json);
+						name = `table_${index}.json`;
+					} else {
+						const bytes = createXlsxBytesFromTable(elementToExport);
+						dataBytes = bytes;
+						name = `table_${index}.xlsx`;
+					}
+					files.push({ name, data: dataBytes });
+					index++;
+				}
+				if (files.length === 0) {
+					alert('未找到有效表格');
+					sendResponse && sendResponse({ ok: false, error: 'NO_VALID_TABLES' });
+					return;
+				}
+				const zipBytes = zipFiles(files);
+				const blob = new Blob([zipBytes], { type: 'application/zip' });
+				const url = URL.createObjectURL(blob);
+				const base = (document.title || "tables").trim().replace(/[\/\\:*?"<>|]/g, "_");
+				const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").replace(/\..+/, "");
+				const fileName = `${base}_${timestamp}_all_${format}.zip`;
+				log('exporting batch as', fileName, 'files:', files.length);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = fileName;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				setTimeout(() => URL.revokeObjectURL(url), 5000);
+				showToast('批量导出完成：' + files.length + ' 个文件');
+				sendResponse && sendResponse({ ok: true, count: files.length });
+			} catch (e) {
+				log('batch export error', e);
+				showToast('批量导出失败');
+				sendResponse && sendResponse({ ok: false, error: 'BATCH_ERROR' });
+			}
 		}
 	});
 })();
