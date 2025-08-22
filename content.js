@@ -162,6 +162,10 @@
 			.replace(/'/g, '&apos;');
 	}
 
+	function escapeForFormula(value) {
+		return String(value).replace(/"/g, '""');
+	}
+
 	function numberToColumnName(index) {
 		let name = '';
 		let i = index;
@@ -172,14 +176,54 @@
 		return name;
 	}
 
+	function toAbsoluteUrl(href) {
+		try { return new URL(href, location.href).toString(); } catch (e) { return href || ''; }
+	}
+
+	function parseCellContent(cell) {
+		const baseText = (cell.innerText || cell.textContent || '').replace(/\s+/g, ' ').trim();
+		const anchors = Array.from(cell.querySelectorAll('a[href]'));
+		const images = Array.from(cell.querySelectorAll('img[src]'));
+
+		// If single clean hyperlink equals base text, emit as HYPERLINK formula
+		if (anchors.length === 1) {
+			const a = anchors[0];
+			const linkText = (a.textContent || '').replace(/\s+/g, ' ').trim();
+			const href = toAbsoluteUrl(a.getAttribute('href'));
+			if (href && (baseText === linkText || baseText === '' || baseText === href)) {
+				const display = linkText || href;
+				const formula = `HYPERLINK("${escapeForFormula(href)}","${escapeForFormula(display)}")`;
+				return { formula };
+			}
+		}
+
+		let text = baseText;
+		// Append hyperlinks as text suffix if present
+		if (anchors.length > 0) {
+			const urls = anchors.map(a => toAbsoluteUrl(a.getAttribute('href'))).filter(Boolean);
+			if (urls.length) {
+				text = text ? `${text} (${urls.join(', ')})` : urls.join(', ');
+			}
+		}
+		// Append images info
+		if (images.length > 0) {
+			const parts = images.map(img => {
+				const alt = (img.getAttribute('alt') || img.getAttribute('title') || '').trim();
+				const src = toAbsoluteUrl(img.getAttribute('src') || '');
+				return alt ? `img:${alt}` : (src ? `img:${src}` : 'img');
+			});
+			text = text ? `${text} [${parts.join('; ')}]` : `[${parts.join('; ')}]`;
+		}
+		return { text };
+	}
+
 	function extractTableData(table) {
 		const rows = [];
 		const rowElements = table.querySelectorAll('tr');
 		for (const tr of rowElements) {
 			const cells = [];
 			for (const cell of Array.from(tr.cells || [])) {
-				let text = (cell.innerText || cell.textContent || '').replace(/\s+/g, ' ').trim();
-				cells.push(text);
+				cells.push(parseCellContent(cell));
 			}
 			if (cells.length > 0) rows.push(cells);
 		}
@@ -196,8 +240,13 @@
 			for (let c = 0; c < row.length; c++) {
 				const colName = numberToColumnName(c);
 				const cellRef = `${colName}${r + 1}`;
-				const value = escapeXml(row[c] == null ? '' : row[c]);
-				xml += `<c r="${cellRef}" t="inlineStr"><is><t xml:space="preserve">${value}</t></is></c>`;
+				const cell = row[c] || {};
+				if (cell.formula) {
+					xml += `<c r="${cellRef}"><f>${escapeXml(cell.formula)}</f></c>`;
+				} else {
+					const value = escapeXml(cell.text == null ? '' : cell.text);
+					xml += `<c r="${cellRef}" t="inlineStr"><is><t xml:space="preserve">${value}</t></is></c>`;
+				}
 			}
 			xml += '</row>';
 		}
