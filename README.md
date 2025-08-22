@@ -9,15 +9,17 @@ Export HTML tables from any web page to real Excel (.xlsx) with one click. Right
 - Auto‑merge header/body when rendered as separate tables
 - Real `.xlsx` file generated in the browser (no servers, no libs)
 - Privacy‑friendly: we do not collect or transmit data
+- **Hyperlink support**: converts single links to Excel HYPERLINK formulas, appends multiple URLs as text
+- **Image support**: extracts alt/title and src attributes, appends image info to cell text
 
 ### Install (developer mode)
 1. Clone or download this folder.
 2. Open Chrome → `chrome://extensions/` → enable Developer Mode.
-3. Click “Load unpacked” and select this folder.
+3. Click "Load unpacked" and select this folder.
 
 ### Usage
 - Open a page with an HTML table.
-- Right‑click near the target table → “导出此处的表格为 Excel”.
+- Right‑click near the target table → "导出此处的表格为 Excel".
 - The table is highlighted briefly and an `.xlsx` is downloaded.
 
 ### Permissions
